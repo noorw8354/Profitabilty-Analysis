@@ -1,0 +1,111 @@
+DROP TABLE IF EXISTS nw_5;
+CREATE TABLE nw_5 AS
+SELECT  trd2.venture
+        ,TO_CHAR(trd2.delivery_communicate_date,'yyyymm') as month       
+        ,trd2.venture_category1_name_en
+        ,trd2.venture_category2_name_en
+        ,trd2.venture_category1_name_en
+       -- ,SUM(actual_gmv*net_item*exchange_rate) AS nmv_usd
+        --,sum(trd2.actual_gmv* COALESCE(fx_exchange_rate,exchange_rate)) as gmv_usd
+        --,avg(unit_price) as unit_price
+        --,avg(list_price) as list_price
+        --,avg(paid_price) as paid_price
+        ,SUM(trd2.actual_gmv*net_item* COALESCE(fx_exchange_rate,exchange_rate)) AS nmv_usd
+        ,SUM((trd2.unit_price - trd2.collectible_discount_amount_seller - trd2.voucher_discount_amount_seller - trd2.bundle_discount_amount_seller)* COALESCE(fx_exchange_rate,exchange_rate)) value_usd
+        ,SUM(comm.net_commission* COALESCE(fx_exchange_rate,exchange_rate)) commission_usd
+        ,SUM(comm.net_commission) commission_PKR
+
+        
+FROM    (
+            SELECT  venture
+                    ,shop_account_code
+                    ,shop_account_name
+                    ,sales_order_id
+                    ,sales_order_item_id
+                    ,product_id
+                    ,product_name
+                    ,shipping_amount_total
+                    ,shipping_amount
+                    ,daraz_sku
+                    ,net_item
+                    ,list_price
+                    ,paid_price
+                    ,venture_category1_name_en
+                    ,venture_category2_name_en
+                    ,venture_category3_name_en
+                    ,venture_category4_name_en
+                    ,venture_category5_name_en
+                    ,venture_category6_name_en
+                    ,exchange_rate
+                    ,business_type
+                    ,business_area
+                    ,fulfillment_create_date
+                    ,delivery_communicate_date
+                    ,actual_gmv
+                    ,unit_price
+                    ,brand_name
+                    ,cogs_amount
+                    ,discount_amount_by_seller
+                    ,discount_amount_by_platform
+                    ,voucher_discount_amount_platform
+                    ,shipping_discount_amount_platform
+                    ,bundle_discount_amount_seller
+                    ,shipping_discount_amount_seller
+                    ,cart_rule_discount_amount
+                    ,voucher_discount_amount_seller
+                    ,collectible_discount_amount_seller
+                    ,loyalty_discount_amount
+                    ,paymentinstantoff_discount_amount
+                    ,paymentcoupon_discount_amount
+                    ,store_credit_amount
+                    ,store_credit_amount_platform
+            FROM    daraz_cdm.dwd_drz_trd_core_df T
+            WHERE   ds = MAX_PT('daraz_cdm.dwd_drz_trd_core_df')
+            AND     TOLOWER(venture_category1_name_en) NOT LIKE '%test%'
+            AND     TO_CHAR(delivery_communicate_date,"yyyymm") in (202301)
+                        AND     T.item_status_esm IN ('delivered','return_denied','return_action_pending')
+            --AND     venture_category1_name_en IN ('Media Music & Books','Sports & Outdoors', 'Stationery & Craft','Toys & Games')                    
+
+            --and    business_type in ('DarazMall')
+            --AND     venture_category1_name_en IN ('Bedding & Bath','Furniture & Décor','Kitchen & Dining','Laundry & Cleaning','Media Music & Books','Motors','Sports & Outdoors','Stationery & Craft','Tools DIY & Outdoor','Toys & Games','Packaging Material','Charity and Donation')
+            --and     shop_account_code in ('PK100YY')
+            and     venture_category1_name_en in ('Media Music & Books','Sports & Outdoors','Stationery & Craft','Toys & Games')
+--AND     venture_category1_name_en IN ('Bedding & Bath','Toys Kids & Babies','Charity and Donation','Furniture & Décor','Furniture & DÃ©cor','Furniture & Decor','Furniture & D√©cor','Home & Living','Kitchen & Dining','Laundry & Cleaning','Media, Music & Books','Media Music & Books','Motors','Sports & Outdoors','Stationery & Craft','Tools, DIY & Outdoor','Tools DIY & Outdoor','Toys & Games','Wholesale','Packaging Material',"Special Promotion") --AND venture_category2_name_en IN ('Kitchen Appliances','Washers & Dryers','Small Kitchen Appliances','Cooling & Heating', 'Generators & Portable Power', 'Irons & Garment Steamers')
+--and     tolower(venture_category2_name_en) LIKE  '%kitchen storage & accessories%'
+--and     (tolower(venture_category3_name_en) like "%bed sheets"
+-----OR      tolower(venture_category3_name_en) like "%cricket"
+--OR      tolower(venture_category3_name_en) like "%note books & pads"
+--OR      tolower(venture_category3_name_en) like "%early development toys"
+--OR      tolower(venture_category3_name_en) like "%wooden toys")
+            AND     net_item = 1
+            AND     T.unit_price > 1
+            AND     T.venture = 'PK'
+            AND     ((seller_id <> 1000000) AND (TOLOWER(shop_account_name) NOT LIKE '%sourceco%'))
+        ) trd2
+LEFT JOIN   (
+                SELECT  sales_order_item_id AS item_id_tag
+                        ,venture
+                        ,COALESCE(SUM(CASE WHEN transaction_type IN ('16','123','82') THEN abs(amount) - vat_amount WHEN transaction_type IN (65,15,104) THEN (
+                                    abs(amount) - vat_amount
+                        ) * -1 END),0) AS net_commission
+                FROM    daraz_ads.ads_drz_transaction_detail_finance_df
+                WHERE   ds = MAX_PT('daraz_ads.ads_drz_transaction_detail_finance_df')
+                AND venture IN ('PK')
+                GROUP BY sales_order_item_id
+                         ,venture
+            ) comm
+ON      trd2.venture = comm.venture
+AND     trd2.sales_order_item_id = comm.item_id_tag
+LEFT JOIN   (
+                SELECT  DISTINCT *
+                        ,1 / fx_rate AS fx_exchange_rate
+                FROM    daraz_ads.ab_fx_rates
+            ) AS f
+ON      f.MONTH = trd2.TO_CHAR(delivery_communicate_date,"yyyymm")
+AND     f.venture = trd2.venture
+GROUP BY trd2.venture
+        ,TO_CHAR(trd2.delivery_communicate_date,'yyyymm') 
+        ,trd2.venture_category1_name_en
+        
+        
+        ;
