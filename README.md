@@ -77,7 +77,7 @@ This repository focuses on the **data engineering and analytical approach** behi
 
 **Noor Wali**  
 Growth Analyst – Daraz  
-[LinkedIn](https://www.linkedin.com/in/your-link) | [GitHub](https://github.com/noorw8354)
+[LinkedIn](https://www.linkedin.com/in/noor-wali-9ba671175/) | [GitHub](https://github.com/noorw8354)
 
 ---
 
